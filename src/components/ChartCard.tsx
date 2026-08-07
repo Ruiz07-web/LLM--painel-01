@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
+import type { ElementType } from 'react';
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -56,7 +56,8 @@ export function ChartCard({ vis }: { vis: Visualization }) {
 
   const xKey = vis.xAxis?.key ?? 'x';
   const visiveis = series.filter((s) => !ocultas.includes(s.key));
-  const Grafico = vis.type === 'bar' ? BarChart : LineChart;
+  // ElementType evita o tipo-união entre BarChart e LineChart, que o JSX rejeita.
+  const Grafico: ElementType = vis.type === 'bar' ? BarChart : LineChart;
 
   return (
     <div className={ampliado ? 'card card-grafico card-amplo' : 'card card-grafico'}>
@@ -106,7 +107,7 @@ export function ChartCard({ vis }: { vis: Visualization }) {
               axisLine={{ stroke: '#D5D8DD' }}
               label={
                 vis.xAxis
-                  ? { value: vis.xAxis.label, position: 'insideBottom', offset: -14, fill: '#8A8F98', fontSize: 12 }
+                  ? { value: vis.xAxis.label, position: 'insideBottom' as const, offset: -14, fill: '#8A8F98', fontSize: 12 }
                   : undefined
               }
             />
@@ -117,7 +118,7 @@ export function ChartCard({ vis }: { vis: Visualization }) {
               width={44}
               label={
                 vis.yAxis
-                  ? { value: vis.yAxis.label, angle: -90, position: 'insideLeft', fill: '#8A8F98', fontSize: 12 }
+                  ? { value: vis.yAxis.label, angle: -90, position: 'insideLeft' as const, fill: '#8A8F98', fontSize: 12 }
                   : undefined
               }
             />
@@ -133,10 +134,15 @@ export function ChartCard({ vis }: { vis: Visualization }) {
               itemStyle={{ color: '#FFFFFF' }}
               cursor={{ stroke: '#1F3864', strokeDasharray: '3 3', opacity: 0.35 }}
             />
-            <Legend content={() => null} />
             {visiveis.map((s, i) =>
               vis.type === 'bar' ? (
-                <Bar key={s.key} dataKey={s.key} name={s.name} fill={corDaSerie(s, i)} radius={[2, 2, 0, 0]} />
+                <Bar
+                  key={s.key}
+                  dataKey={s.key}
+                  name={s.name}
+                  fill={corDaSerie(s, i)}
+                  radius={[2, 2, 0, 0] as [number, number, number, number]}
+                />
               ) : (
                 <Line
                   key={s.key}

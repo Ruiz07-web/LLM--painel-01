@@ -3,7 +3,7 @@
 (texto + bloco ```chart) com DADOS REAIS da base, para verificar a renderizacao
 do grafico e da tabela sem depender do n8n."""
 import csv, json, os
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DADOS = r'C:\Users\omarg\.claude\ocms-projeto\mulheres-em-evidencia\dados'
 
@@ -91,4 +91,4 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     print('mock em http://localhost:8901/chat')
-    HTTPServer(('127.0.0.1', 8901), H).serve_forever()
+    ThreadingHTTPServer(('127.0.0.1', 8901), H).serve_forever()

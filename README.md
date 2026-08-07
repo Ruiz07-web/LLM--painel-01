@@ -63,6 +63,16 @@ cp .env.example .env.local
 npm run dev
 ```
 
+### Checagem de tipos
+
+O `build` roda apenas `vite build` (esbuild remove os tipos sem verificá-los),
+para que um detalhe de tipagem não derrube o deploy. A verificação é um passo
+separado — rode antes de abrir PR ou publicar mudanças maiores:
+
+```bash
+npm run typecheck
+```
+
 ### Pré-visualização sem Node
 
 `preview.html` roda a mesma interface via CDN, sem build — útil para conferir o
