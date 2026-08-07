@@ -42,12 +42,14 @@ def resposta(pergunta):
                + '\n'.join(f"| {r['municipio']} | {r['total']} |" for r in RANK[:5])
                + '\n\nFonte: Painel Mulheres em Evidência – aba Feminicídio.')
     elif 'barra' in p or 'compar' in p:
-        vis = {'type': 'bar', 'title': 'Ocorrências por ano', 'subtitle': 'Consumado e tentado · MS',
-               'data': SERIE, 'xAxis': {'key': 'ano', 'label': 'Ano'},
+        # Municipios: nomes longos, que é o caso que estressa os rótulos do eixo X.
+        vis = {'type': 'bar', 'title': 'Top 8 Municípios por Ocorrências (2025)',
+               'subtitle': 'Consumado e tentado · MS',
+               'data': RANK[:8], 'xAxis': {'key': 'municipio', 'label': 'Município'},
                'yAxis': {'key': 'total', 'label': 'Ocorrências'},
                'series': [{'key': 'consumado', 'name': 'Consumado'},
                           {'key': 'tentado', 'name': 'Tentado'}]}
-        txt = 'Comparativo anual de ocorrências:'
+        txt = 'Comparativo entre os municípios com mais ocorrências em 2025:'
     else:
         vis = {'type': 'line', 'title': 'Evolução Anual (2015–2025)',
                'subtitle': 'Feminicídio consumado e tentado · Mato Grosso do Sul',

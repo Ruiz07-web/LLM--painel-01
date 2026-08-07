@@ -23,6 +23,19 @@ function corDaSerie(s: Serie, i: number): string {
   return CORES.extra[i % CORES.extra.length];
 }
 
+// Em gráficos de barras as categorias são nomes longos (municípios). Sem isto o
+// Recharts oculta os rótulos que se sobrepõem e barras ficam sem identificação.
+function TickInclinado(props: { x?: number; y?: number; payload?: { value?: string } }) {
+  const { x = 0, y = 0, payload } = props;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text dy={10} textAnchor="end" transform="rotate(-32)" fill="#595959" fontSize={11}>
+        {payload?.value}
+      </text>
+    </g>
+  );
+}
+
 const IconeAmpliar = () => (
   <svg viewBox="0 0 16 16" className="ico">
     <polyline points="6,2 2,2 2,6" />
@@ -57,7 +70,8 @@ export function ChartCard({ vis }: { vis: Visualization }) {
   const xKey = vis.xAxis?.key ?? 'x';
   const visiveis = series.filter((s) => !ocultas.includes(s.key));
   // ElementType evita o tipo-união entre BarChart e LineChart, que o JSX rejeita.
-  const Grafico: ElementType = vis.type === 'bar' ? BarChart : LineChart;
+  const barras = vis.type === 'bar';
+  const Grafico: ElementType = barras ? BarChart : LineChart;
 
   return (
     <div className={ampliado ? 'card card-grafico card-amplo' : 'card card-grafico'}>
@@ -98,15 +112,20 @@ export function ChartCard({ vis }: { vis: Visualization }) {
 
       <div className="grafico" ref={box}>
         <ResponsiveContainer width="100%" height={ampliado ? 460 : 300}>
-          <Grafico data={vis.data} margin={{ top: 8, right: 16, bottom: 24, left: 8 }}>
+          <Grafico
+            data={vis.data}
+            margin={{ top: 8, right: 16, bottom: barras ? 56 : 24, left: 8 }}
+          >
             <CartesianGrid stroke="#EEEEEE" vertical={false} />
             <XAxis
               dataKey={xKey}
-              tick={{ fill: '#595959', fontSize: 12 }}
+              tick={barras ? <TickInclinado /> : { fill: '#595959', fontSize: 12 }}
+              interval={barras ? 0 : 'preserveStartEnd'}
+              height={barras ? 70 : 30}
               tickLine={false}
               axisLine={{ stroke: '#D5D8DD' }}
               label={
-                vis.xAxis
+                vis.xAxis && !barras
                   ? { value: vis.xAxis.label, position: 'insideBottom' as const, offset: -14, fill: '#8A8F98', fontSize: 12 }
                   : undefined
               }

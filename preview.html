@@ -110,12 +110,19 @@ function Markdown({ texto }) {
   return html`<${React.Fragment}>${bloco}<//>`;
 }
 
+function TickInclinado({ x = 0, y = 0, payload }) {
+  return html`<g transform=${'translate(' + x + ',' + y + ')'}>
+    <text dy="10" text-anchor="end" transform="rotate(-32)" fill="#595959" font-size="11">${payload && payload.value}</text>
+  </g>`;
+}
+
 function ChartCard({ vis }) {
   const series = vis.series || [];
   const [ocultas, setOcultas] = useState([]);
   const [amplo, setAmplo] = useState(false);
   const visiveis = series.filter(s => !ocultas.includes(s.key));
-  const Grafico = vis.type === 'bar' ? BarChart : LineChart;
+  const barras = vis.type === 'bar';
+  const Grafico = barras ? BarChart : LineChart;
   const xKey = (vis.xAxis && vis.xAxis.key) || 'x';
 
   const alternar = k => setOcultas(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k]);
@@ -141,9 +148,11 @@ function ChartCard({ vis }) {
     </div>
     <div class="grafico">
       <${ResponsiveContainer} width="100%" height=${amplo ? 460 : 300}>
-        <${Grafico} data=${vis.data} margin=${{ top: 8, right: 16, bottom: 24, left: 8 }}>
+        <${Grafico} data=${vis.data} margin=${{ top: 8, right: 16, bottom: barras ? 56 : 24, left: 8 }}>
           <${CartesianGrid} stroke="#EEEEEE" vertical=${false} />
-          <${XAxis} dataKey=${xKey} tick=${{ fill: '#595959', fontSize: 12 }} tickLine=${false} axisLine=${{ stroke: '#D5D8DD' }} />
+          <${XAxis} dataKey=${xKey} tick=${barras ? html`<${TickInclinado} />` : { fill: '#595959', fontSize: 12 }}
+                    interval=${barras ? 0 : 'preserveStartEnd'} height=${barras ? 70 : 30}
+                    tickLine=${false} axisLine=${{ stroke: '#D5D8DD' }} />
           <${YAxis} tick=${{ fill: '#8A8F98', fontSize: 12 }} tickLine=${false} axisLine=${false} width=${44} />
           <${Tooltip} contentStyle=${{ background: '#1F3864', border: 'none', borderRadius: 7, color: '#fff', fontSize: 12.5 }}
                       labelStyle=${{ color: '#fff', opacity: .7, fontWeight: 700 }} itemStyle=${{ color: '#fff' }}
