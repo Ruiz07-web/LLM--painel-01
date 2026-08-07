@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./src/styles.css" />
+<title>Preview — Assistente de Dados (OCMS)</title>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+  Pré-visualização SEM build (React + Recharts via CDN). Espelha a lógica de
+  src/App.tsx para permitir verificação no navegador enquanto o projeto React
+  é compilado na nuvem. Não é o artefato de produção.
+-->
+<script type="module">
+import React, { useState, useRef, useEffect, useMemo } from 'https://esm.sh/react@18.3.1';
+import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+import htm from 'https://esm.sh/htm@3.1.1';
+import {
+  ResponsiveContainer, LineChart, BarChart, Line, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip
+} from 'https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1';
+
+const html = htm.bind(React.createElement);
+
+const WEBHOOK = new URLSearchParams(location.search).get('webhook')
+  || 'https://SEU-N8N/webhook/SEU-ID/chat';
+
+const FONTE = 'Fonte: Painel Mulheres em Evidência – aba Feminicídio (dados atualizados até 30/06/2026).';
+const CORES = { consumado: '#8B0000', tentado: '#FF6B6B', extra: ['#1F3864', '#31538F', '#8B0000', '#FF6B6B'] };
+const SUGESTOES = [
+  'Evolução anual de 2015 a 2025',
+  'Municípios com maior crescimento nos últimos cinco anos',
+  'Ranking de municípios em 2025',
+  'Comparar Campo Grande e Dourados',
+];
+
+const BLOCO = /```chart\s*([\s\S]*?)```/i;
+function extrair(texto) {
+  const m = texto.match(BLOCO);
+  if (!m) return { limpo: texto };
+  try { return { limpo: texto.replace(BLOCO, '').trim(), visualization: JSON.parse(m[1].trim()) }; }
+  catch { return { limpo: texto.replace(BLOCO, '').trim() }; }
+}
+
+async function perguntar(pergunta, sessionId) {
+  const r = await fetch(WEBHOOK, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'sendMessage', sessionId, chatInput: pergunta }),
+  });
+  if (!r.ok) throw new Error('O servidor respondeu ' + r.status + '.');
+  const j = await r.json();
+  const { limpo, visualization } = extrair(j.output || '');
+  return { texto: limpo, visualization: j.visualization || visualization };
+}
+
+function corDaSerie(s, i) {
+  if (s.color) return s.color;
+  const k = (s.key || '').toLowerCase();
+  if (k.includes('consum')) return CORES.consumado;
+  if (k.includes('tent')) return CORES.tentado;
+  return CORES.extra[i % CORES.extra.length];
+}
+
+const ehLinhaTabela = l => l.startsWith('|') && l.endsWith('|') && l.length > 2;
+const ehSeparador = l => /^\|[\s:|-]+\|$/.test(l) && l.includes('-');
+const celulas = l => l.slice(1, -1).split('|').map(c => c.trim());
+
+function negrito(txt, k) {
+  return txt.split(/\*\*(.+?)\*\*/g).map((p, j) =>
+    j % 2 === 1 ? html`<strong class="md-strong" key=${k + 'b' + j}>${p}</strong>` : html`<span key=${k + 't' + j}>${p}</span>`);
+}
+
+function Tabela({ linhas, k }) {
+  const corpo = linhas.filter(l => !ehSeparador(l));
+  if (!corpo.length) return null;
+  const cab = celulas(corpo[0]);
+  const dados = corpo.slice(1).map(celulas);
+  return html`
+    <div class="md-tabela-scroll">
+      <table class="md-tabela">
+        <thead><tr>${cab.map((c, i) => html`<th key=${k + 'h' + i}>${negrito(c, k + 'h' + i)}</th>`)}</tr></thead>
+        <tbody>${dados.map((l, i) => html`<tr key=${k + 'r' + i}>${l.map((c, j) => html`<td key=${k + 'r' + i + 'c' + j}>${negrito(c, k + 'r' + i + 'c' + j)}</td>`)}</tr>`)}</tbody>
+      </table>
+    </div>`;
+}
+
+function Markdown({ texto }) {
+  const bloco = [];
+  let buf = [];
+  const flush = i => { if (buf.length) { bloco.push(html`<${Tabela} key=${'tb' + i} linhas=${buf} k=${'tb' + i} />`); buf = []; } };
+  const linhas = texto.split('\n');
+  linhas.forEach((bruta, i) => {
+    const linha = bruta.trim();
+    if (ehLinhaTabela(linha)) { buf.push(linha); return; }
+    flush(i);
+    if (!linha) return;
+    const item = linha.match(/^[-*•]\s+(.*)$/);
+    bloco.push(item
+      ? html`<div class="md-li" key=${i}><span class="md-bullet">•</span><span>${negrito(item[1], 'li' + i)}</span></div>`
+      : html`<div class="md-p" key=${i}>${negrito(linha, 'p' + i)}</div>`);
+  });
+  flush(linhas.length);
+  return html`<${React.Fragment}>${bloco}<//>`;
+}
+
+function ChartCard({ vis }) {
+  const series = vis.series || [];
+  const [ocultas, setOcultas] = useState([]);
+  const [amplo, setAmplo] = useState(false);
+  const visiveis = series.filter(s => !ocultas.includes(s.key));
+  const Grafico = vis.type === 'bar' ? BarChart : LineChart;
+  const xKey = (vis.xAxis && vis.xAxis.key) || 'x';
+
+  const alternar = k => setOcultas(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k]);
+
+  return html`
+  <div class=${'card card-grafico' + (amplo ? ' card-amplo' : '')}>
+    <div class="card-head">
+      <div class="card-titulos">
+        <div class="card-titulo">${vis.title}</div>
+        ${vis.subtitle && html`<div class="card-sub">${vis.subtitle}</div>`}
+      </div>
+      <div class="card-acoes">
+        <button class="btn-ico" title="Ampliar" onClick=${() => setAmplo(v => !v)}>
+          <svg viewBox="0 0 16 16" class="ico"><polyline points="6,2 2,2 2,6"/><polyline points="10,14 14,14 14,10"/><line x1="2" y1="2" x2="6.5" y2="6.5"/><line x1="14" y1="14" x2="9.5" y2="9.5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="legenda">
+      ${series.map((s, i) => html`
+        <button key=${s.key} class=${'chip-legenda' + (ocultas.includes(s.key) ? ' off' : '')} onClick=${() => alternar(s.key)}>
+          <span class="chip-cor" style=${{ background: ocultas.includes(s.key) ? '#D5D8DD' : corDaSerie(s, i) }}></span>${s.name}
+        </button>`)}
+    </div>
+    <div class="grafico">
+      <${ResponsiveContainer} width="100%" height=${amplo ? 460 : 300}>
+        <${Grafico} data=${vis.data} margin=${{ top: 8, right: 16, bottom: 24, left: 8 }}>
+          <${CartesianGrid} stroke="#EEEEEE" vertical=${false} />
+          <${XAxis} dataKey=${xKey} tick=${{ fill: '#595959', fontSize: 12 }} tickLine=${false} axisLine=${{ stroke: '#D5D8DD' }} />
+          <${YAxis} tick=${{ fill: '#8A8F98', fontSize: 12 }} tickLine=${false} axisLine=${false} width=${44} />
+          <${Tooltip} contentStyle=${{ background: '#1F3864', border: 'none', borderRadius: 7, color: '#fff', fontSize: 12.5 }}
+                      labelStyle=${{ color: '#fff', opacity: .7, fontWeight: 700 }} itemStyle=${{ color: '#fff' }}
+                      cursor=${{ stroke: '#1F3864', strokeDasharray: '3 3', opacity: .35 }} />
+          ${visiveis.map((s, i) => vis.type === 'bar'
+            ? html`<${Bar} key=${s.key} dataKey=${s.key} name=${s.name} fill=${corDaSerie(s, i)} radius=${[2,2,0,0]} />`
+            : html`<${Line} key=${s.key} type="monotone" dataKey=${s.key} name=${s.name} stroke=${corDaSerie(s, i)}
+                     strokeWidth=${2.5} dot=${{ r: 3, fill: '#fff', stroke: corDaSerie(s, i), strokeWidth: 2 }} activeDot=${{ r: 5 }} />`)}
+        <//>
+      <//>
+    </div>
+    <div class="card-fonte">${vis.source || FONTE}</div>
+  </div>`;
+}
+
+function TableCard({ vis }) {
+  const colunas = useMemo(() => vis.columns && vis.columns.length
+    ? vis.columns
+    : Object.keys(vis.data[0] || {}).map(k => ({ key: k, label: k })), [vis]);
+  const [ordem, setOrdem] = useState(null);
+  const linhas = useMemo(() => {
+    if (!ordem) return vis.data;
+    const c = [...vis.data];
+    c.sort((a, b) => {
+      const va = a[ordem.key], vb = b[ordem.key];
+      if (typeof va === 'number' && typeof vb === 'number') return ordem.asc ? va - vb : vb - va;
+      return ordem.asc ? String(va).localeCompare(String(vb), 'pt-BR') : String(vb).localeCompare(String(va), 'pt-BR');
+    });
+    return c;
+  }, [vis.data, ordem]);
+  return html`
+  <div class="card card-tabela">
+    <div class="card-titulo card-titulo-tabela">${vis.title}</div>
+    <div class="tabela-scroll">
+      <table class="tabela">
+        <thead><tr>${colunas.map(c => html`<th key=${c.key} onClick=${() => setOrdem(p => p && p.key === c.key ? { key: c.key, asc: !p.asc } : { key: c.key, asc: true })}>${c.label}${ordem && ordem.key === c.key ? (ordem.asc ? ' ↑' : ' ↓') : ''}</th>`)}</tr></thead>
+        <tbody>${linhas.map((l, i) => html`<tr key=${i}>${colunas.map(c => html`<td key=${c.key}>${l[c.key] ?? '—'}</td>`)}</tr>`)}</tbody>
+      </table>
+    </div>
+    <div class="card-fonte">${vis.source || FONTE}</div>
+  </div>`;
+}
+
+function App() {
+  const [sidebar, setSidebar] = useState(true);
+  const [msgs, setMsgs] = useState([]);
+  const [texto, setTexto] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [hist, setHist] = useState([]);
+  const sess = useRef('preview-' + Date.now());
+  const ultima = useRef('');
+  const fim = useRef(null);
+
+  useEffect(() => { fim.current && fim.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [msgs]);
+
+  async function enviar(p) {
+    const q = (p || '').trim();
+    if (!q || ocupado) return;
+    ultima.current = q; setTexto(''); setOcupado(true);
+    const id = 'l' + Date.now();
+    setMsgs(m => [...m, { id: 'u' + Date.now(), role: 'user', text: q }, { id, role: 'assistant', state: 'loading' }]);
+    setHist(h => [{ id: 'h' + Date.now(), title: q }, ...h].slice(0, 12));
+    try {
+      const r = await perguntar(q, sess.current);
+      setMsgs(m => m.map(x => x.id === id ? { ...x, text: r.texto, visualization: r.visualization, state: 'done' } : x));
+    } catch (e) {
+      setMsgs(m => m.map(x => x.id === id ? { ...x, text: 'Não consegui consultar a base. ' + e.message, state: 'error' } : x));
+    } finally { setOcupado(false); }
+  }
+
+  return html`
+  <div class="app">
+    ${sidebar && html`
+    <aside class="sidebar">
+      <div class="marca">
+        <div class="marca-quadro"></div>
+        <div class="marca-txt">
+          <div class="marca-nome">MULHERES EM EVIDÊNCIA</div>
+          <div class="marca-sub">OCMS · Mato Grosso do Sul</div>
+        </div>
+      </div>
+      <div class="sidebar-acao">
+        <button class="btn-nova" onClick=${() => { setMsgs([]); sess.current = 'preview-' + Date.now(); }}>
+          <svg viewBox="0 0 16 16" class="ico"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+          Nova conversa
+        </button>
+      </div>
+      <div class="sidebar-rotulo">HISTÓRICO</div>
+      <nav class="sidebar-lista">${hist.map(h => html`<div class="sidebar-item" key=${h.id}>${h.title}</div>`)}</nav>
+      <div class="sidebar-rodape">Dados: Painel Mulheres em Evidência<br/>Atualização: 30/06/2026</div>
+    </aside>`}
+
+    <main class="main">
+      <header class="topo">
+        <button class="btn-ico" onClick=${() => setSidebar(v => !v)}>
+          <svg viewBox="0 0 16 16" class="ico"><line x1="2.5" y1="4" x2="13.5" y2="4"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><line x1="2.5" y1="12" x2="13.5" y2="12"/></svg>
+        </button>
+        <div class="topo-txt">
+          <h1>Assistente de Dados — Feminicídio</h1>
+          <div class="topo-sub">Consulta em linguagem natural sobre a base do Observatório</div>
+        </div>
+        <div class="flex1"></div>
+        <div class="pill"><span class="pill-dot"></span>Supabase conectado</div>
+      </header>
+
+      <div class="rolagem">
+        <div class="coluna">
+          ${msgs.length === 0 && html`
+          <div class="vazio">
+            <div class="vazio-quadro"></div>
+            <h2>Pergunte aos dados</h2>
+            <p>Perguntas em português são traduzidas em consultas SQL na base do Observatório. Quando o resultado tem forma de série, o gráfico aparece junto da resposta.</p>
+          </div>`}
+
+          ${msgs.map(m => {
+            if (m.role === 'user') return html`<div class="linha-dir" key=${m.id}><div class="bolha-user">${m.text}</div></div>`;
+            if (m.state === 'loading') return html`<div class="linha-esq" key=${m.id}><div class="bolha-load"><span class="spinner"></span>Processando consulta…</div></div>`;
+            if (m.state === 'error') return html`
+              <div class="col-esq" key=${m.id}>
+                <div class="bolha-erro">${m.text}</div>
+                <button class="btn-retry" onClick=${() => enviar(ultima.current)}>Tentar novamente</button>
+              </div>`;
+            return html`
+              <div class="col-esq" key=${m.id}>
+                <div class="bolha-bot"><${Markdown} texto=${m.text} /></div>
+                ${m.visualization && (m.visualization.type === 'table'
+                  ? html`<${TableCard} vis=${m.visualization} />`
+                  : html`<${ChartCard} vis=${m.visualization} />`)}
+              </div>`;
+          })}
+          <div ref=${fim} class="fim"></div>
+        </div>
+      </div>
+
+      <div class="composer-area">
+        <div class="coluna">
+          <div class="chips">
+            ${SUGESTOES.map(s => html`<button class="chip" key=${s} disabled=${ocupado} onClick=${() => enviar(s)}>${s}</button>`)}
+          </div>
+          <div class="composer">
+            <textarea rows="1" placeholder="Pergunte sobre feminicídio em Mato Grosso do Sul…"
+              value=${texto} onChange=${e => setTexto(e.target.value)}
+              onKeyDown=${e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(texto); } }}></textarea>
+            <button class="btn-enviar" disabled=${ocupado || !texto.trim()} onClick=${() => enviar(texto)}>
+              <svg viewBox="0 0 16 16" class="ico"><line x1="8" y1="13" x2="8" y2="3"/><polyline points="4,7 8,3 12,7"/></svg>
+            </button>
+          </div>
+          <div class="aviso">As respostas são geradas a partir da base do Observatório. Confira os números antes de publicar.</div>
+        </div>
+      </div>
+    </main>
+  </div>`;
+}
+
+createRoot(document.getElementById('root')).render(html`<${App} />`);
+</script>
+</body>
+</html>
