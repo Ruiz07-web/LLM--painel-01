@@ -7,9 +7,10 @@ import { TableCard } from './components/TableCard';
 
 const SUGESTOES = [
   'Evolução anual de 2015 a 2025',
-  'Municípios com maior crescimento nos últimos cinco anos',
-  'Ranking de municípios em 2025',
-  'Comparar Campo Grande e Dourados',
+  'Ranking de municípios por taxa por 100 mil mulheres em 2025',
+  'Violência doméstica contra a mulher em Campo Grande em 2024',
+  'Medidas protetivas concedidas em 2024',
+  'Onde buscar ajuda em Dourados',
 ];
 
 function novoId() {
@@ -118,7 +119,7 @@ export default function App() {
           <div className="sidebar-rodape">
             Dados: Painel Mulheres em Evidência
             <br />
-            Atualização: 30/06/2026
+            Atualização: setembro de 2026
           </div>
         </aside>
       )}

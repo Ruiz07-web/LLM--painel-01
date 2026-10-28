@@ -4,7 +4,7 @@ const WEBHOOK = import.meta.env.VITE_WEBHOOK_URL as string;
 const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT ?? 180000);
 
 export const FONTE =
-  'Fonte: Painel Mulheres em Evidência – aba Feminicídio (dados atualizados até 30/06/2026).';
+  'Fonte: Painel Mulheres em Evidência – Observatório da Cidadania de MS (dados atualizados até setembro de 2026).';
 
 export const CORES = {
   consumado: '#8B0000',

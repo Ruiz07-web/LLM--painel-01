@@ -31,13 +31,14 @@ const html = htm.bind(React.createElement);
 const WEBHOOK = new URLSearchParams(location.search).get('webhook')
   || 'https://SEU-N8N/webhook/SEU-ID/chat';
 
-const FONTE = 'Fonte: Painel Mulheres em Evidência – aba Feminicídio (dados atualizados até 30/06/2026).';
+const FONTE = 'Fonte: Painel Mulheres em Evidência – Observatório da Cidadania de MS (dados atualizados até setembro de 2026).';
 const CORES = { consumado: '#8B0000', tentado: '#FF6B6B', extra: ['#1F3864', '#31538F', '#8B0000', '#FF6B6B'] };
 const SUGESTOES = [
   'Evolução anual de 2015 a 2025',
-  'Municípios com maior crescimento nos últimos cinco anos',
-  'Ranking de municípios em 2025',
-  'Comparar Campo Grande e Dourados',
+  'Ranking de municípios por taxa por 100 mil mulheres em 2025',
+  'Violência doméstica contra a mulher em Campo Grande em 2024',
+  'Medidas protetivas concedidas em 2024',
+  'Onde buscar ajuda em Dourados',
 ];
 
 const BLOCO = /```chart\s*([\s\S]*?)```/i;
@@ -242,7 +243,7 @@ function App() {
       </div>
       <div class="sidebar-rotulo">HISTÓRICO</div>
       <nav class="sidebar-lista">${hist.map(h => html`<div class="sidebar-item" key=${h.id}>${h.title}</div>`)}</nav>
-      <div class="sidebar-rodape">Dados: Painel Mulheres em Evidência<br/>Atualização: 30/06/2026</div>
+      <div class="sidebar-rodape">Dados: Painel Mulheres em Evidência<br/>Atualização: setembro de 2026</div>
     </aside>`}
 
     <main class="main">
