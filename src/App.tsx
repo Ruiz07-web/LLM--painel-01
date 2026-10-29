@@ -134,7 +134,7 @@ export default function App() {
             </svg>
           </button>
           <div className="topo-txt">
-            <h1>Assistente de Dados — Feminicídio</h1>
+            <h1>Assistende de Dados - Violência contra à Mulhe</h1>
             <div className="topo-sub">Consulta em linguagem natural sobre a base do Observatório</div>
           </div>
           <div className="flex1" />
